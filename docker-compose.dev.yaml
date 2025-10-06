@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+
+  app:
+    container_name: rag_max-dev
+    image: rag_max:development
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    environment:
+      -  QDRANT_HOST=${QDRANT_HOST}
+      -  QDRANT_PORT=${QDRANT_PORT}
+      -  API_HOST=${API_HOST}
+      -  API_PORT=${API_PORT}
+      -  GIT_PYTHON_REFRESH=quiet
+    ports:
+      - 8000:8000
+    restart: unless-stopped
+    networks:
+      - rag-max
+    volumes:
+      - .:/app
+
+    runtime: nvidia
+
+networks:
+  rag-max:
+
