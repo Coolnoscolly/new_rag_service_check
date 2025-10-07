@@ -33,7 +33,9 @@ from langchain_ollama import OllamaLLM
 
 from ragas.run_config import RunConfig
 
-my_run_config = RunConfig(max_workers=64, timeout=600)
+import pandas as pd
+
+my_run_config = RunConfig(max_workers=64, timeout=600000)
 
 
 logger = logging.getLogger(__name__)
@@ -170,28 +172,31 @@ async def process_bench():
     # 1. Убрать креды олламы и имени QDRANT коллекции
     # 2. Подготовить датасет
 
+    file_path = "./rag_service/app/datasets/ru_rag_test_dataset.pkl"
+
+    df = pd.read_pickle(file_path)
+
     ollama_llm = OllamaLLM(
-        model="gemma2:27b",
-        temperature=0,
+        model="qwen2.5:7b",
+        temperature=0.1,
         base_url="http://",
     )
 
     start_time = datetime.now()
 
-    sample_queries = [
-        "Что такое CRUD?",
-    ]
+    sample_queries = df["Вопрос"].tolist()
+    expected_responses = df["Правильный ответ"].tolist()
 
-    expected_responses = [
-        "CRUD для процедур: создание (create), чтение (read), модификация (update), удаление (delete)",
-    ]
+    sample_queries = sample_queries[0:10:1]
+    expected_responses = expected_responses[0:10:1]
+    logger.info(sample_queries)
 
     dataset = []
     try:
         for query, reference in zip(sample_queries, expected_responses):
             request = QueryRequest(
                 query=query,
-                collection_name="799d66cc-5071-4044-9a7e-9a6cbf0d3575",
+                collection_name="dataset_ru_chunker_token_bf3907a5-3ab3-4444-b963-66ad41eab5ed",
                 top_k=5,
                 score_threshold=0.2,
                 temperature=0.1,
@@ -230,7 +235,11 @@ async def process_bench():
                 processing_time=processing_time,
                 status="success",
             )
-            logger.info(f"Ответ: {response}")
+            logger.info(f"Вопрос: {request.query}")
+            logger.info(f"Ответ: {response.answer}")
+            logger.info(f"Правильный ответ: {reference}")
+            sources = [source.file_name for source in response.sources]
+            logger.info(f"Источники: {sources}")
 
             dataset.append(
                 {
@@ -276,6 +285,8 @@ async def process_bench():
         )
 
 
+
+
 @app.post("/search", tags=["RAG"])
 async def search_documents(request: QueryRequest):
     try:
@@ -318,3 +329,4 @@ async def search_documents(request: QueryRequest):
 @app.get("/collections", tags=["Management"])
 async def list_collections():
     return {"collections": list(rag_pipelines.keys()), "total": len(rag_pipelines)}
+
